@@ -1,0 +1,17 @@
+[project]
+name = "mechalab"
+version = "0.1.0"
+description = "The LeRobot wrapper to operate your robot from the browser"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi[standard]>=0.117.1",
+    "lerobot==0.3.3",
+]
+
+[tool.uv]
+package = true
+
+[project.scripts]
+mechalab = "scripts.run:main"
+
