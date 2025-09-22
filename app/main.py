@@ -13,7 +13,7 @@ from pathlib import Path
 from . import config
 
 # Teleoperation
-from .teleoperating import (
+from .teleoperate import (
     TeleoperateRequest,
     handle_start_teleoperation,
     handle_stop_teleoperation,
@@ -22,7 +22,7 @@ from .teleoperating import (
 )
 
 # Calibration
-from .calibrating import CalibrationRequest, calibration_manager
+from .calibrate import CalibrationRequest, calibration_manager
 
 logger = logging.getLogger(__name__)
 
