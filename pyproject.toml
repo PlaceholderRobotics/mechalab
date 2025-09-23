@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mechalab"
 version = "0.1.0"
@@ -6,11 +10,18 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi[standard]>=0.117.1",
+    "feetech-servo-sdk>=1.0.0",
     "lerobot==0.3.3",
 ]
 
 [tool.uv]
 package = true
+
+[tool.setuptools.packages.find]
+# Include both the CLI package and the FastAPI app package
+namespaces = true
+where = ["."]
+include = ["scripts*", "app*"]
 
 [project.scripts]
 mechalab = "scripts.run:main"

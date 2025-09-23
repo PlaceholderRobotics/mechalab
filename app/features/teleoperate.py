@@ -1,27 +1,18 @@
 import logging
-import os
-import shutil
 import select
 import sys
 import termios
 import tty
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
-from pydantic import BaseModel
 
 from lerobot.teleoperators.so101_leader import SO101LeaderConfig, SO101Leader
 from lerobot.robots.so101_follower import SO101FollowerConfig, SO101Follower
-from lerobot.teleoperate import teleoperate, TeleoperateConfig
+from app.types.so_arm import TeleoperateRequest
 
 # Import calibration paths and functions from config (shared constants)
-from .config import (
-    CALIBRATION_BASE_PATH_TELEOP,
-    CALIBRATION_BASE_PATH_ROBOTS,
-    LEADER_CONFIG_PATH,
-    FOLLOWER_CONFIG_PATH,
-    setup_calibration_files,
-)
+from app.config import setup_calibration_files
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +21,6 @@ teleoperation_active = False
 teleoperation_thread = None
 current_robot = None
 current_teleop = None
-
-
-class TeleoperateRequest(BaseModel):
-    leader_port: str
-    follower_port: str
-    leader_config: str
-    follower_config: str
 
 
 def setup_keyboard():

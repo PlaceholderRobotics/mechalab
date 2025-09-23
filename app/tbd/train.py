@@ -5,11 +5,8 @@ import time
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
-import json
 import queue
 import os
-import signal
-import psutil
 
 logger = logging.getLogger(__name__)
 

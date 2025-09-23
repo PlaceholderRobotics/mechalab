@@ -14,12 +14,10 @@ from typing import Optional, Dict, Any
 
 from lerobot.robots import (
     Robot,
-    RobotConfig,
     make_robot_from_config,
 )
 from lerobot.teleoperators import (
     Teleoperator,
-    TeleoperatorConfig,
     make_teleoperator_from_config,
 )
 from lerobot.motors import MotorCalibration

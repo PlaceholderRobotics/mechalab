@@ -6,25 +6,15 @@ from concurrent.futures import ThreadPoolExecutor
 from pydantic import BaseModel
 
 # Import the main record functionality to reuse it
-from lerobot.record import record, RecordConfig, DatasetRecordConfig
+from lerobot.record import RecordConfig, DatasetRecordConfig
 from lerobot.robots.so101_follower import SO101FollowerConfig
 from lerobot.teleoperators.so101_leader import SO101LeaderConfig
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-# Import for patching the keyboard listener
-from lerobot.utils import control_utils
-import functools
-
 logger = logging.getLogger(__name__)
 
 # Import calibration paths from config (shared constants)
-from .config import (
-    CALIBRATION_BASE_PATH_TELEOP,
-    CALIBRATION_BASE_PATH_ROBOTS,
-    LEADER_CONFIG_PATH,
-    FOLLOWER_CONFIG_PATH,
-    setup_calibration_files,
-)
+from app.config import setup_calibration_files
 
 # Global variables for recording state
 recording_active = False
