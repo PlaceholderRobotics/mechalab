@@ -1,37 +1,19 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 import glob
 import asyncio
+from contextlib import asynccontextmanager
 from . import config
 from .services.websocket_manager import manager
 from .features.teleoperate import (
     TeleoperateRequest,
-    handle_start_teleoperation,
-    handle_stop_teleoperation,
-    handle_teleoperation_status,
-    handle_get_joint_positions,
+    TeleoperationManager,
+    # handle_get_joint_positions,
 )
 from .features.calibrate import CalibrationRequest, calibration_manager
-
-logger = logging.getLogger(__name__)
-
-
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
-
-# Import shared configuration constants
 from app.config import (
     LEADER_CONFIG_PATH,
     FOLLOWER_CONFIG_PATH,
@@ -41,6 +23,41 @@ from app.config import (
     save_robot_port,
     get_saved_robot_port,
     get_default_robot_port,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    app.state.teleop = TeleoperationManager()
+
+    yield
+
+    # Shutdown
+    logger.info("🔄 FastAPI shutting down, cleaning up...")
+    # from .replaying import cleanup as replay_cleanup
+
+    # replay_cleanup()
+    if manager:
+        manager.stop_broadcast_thread()
+    logger.info("✅ Cleanup completed")
+
+
+def get_teleop_manager(request: Request):
+    return request.app.state.teleop
+
+
+app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 
@@ -64,28 +81,30 @@ def get_configs():
     return {"leader_configs": leader_configs, "follower_configs": follower_configs}
 
 
-@app.post("/teleoperate")
-def teleoperate_arm(request: TeleoperateRequest):
+@app.post("/teleop/start")
+def teleoperate_arm(
+    req: TeleoperateRequest, m: TeleoperationManager = Depends(get_teleop_manager)
+):
     """Start teleoperation of the robot arm"""
-    return handle_start_teleoperation(request, manager)
+    return m.start(req)
 
 
-@app.post("/stop-teleoperation")
-def stop_teleoperation():
+@app.post("/teleop/stop")
+def stop_teleoperation(m: TeleoperationManager = Depends(get_teleop_manager)):
     """Stop the current teleoperation session"""
-    return handle_stop_teleoperation()
+    return m.stop()
 
 
-@app.get("/teleoperation-status")
-def teleoperation_status():
+@app.get("/teleop/status")
+def teleoperation_status(m: TeleoperationManager = Depends(get_teleop_manager)):
     """Get the current teleoperation status"""
-    return handle_teleoperation_status()
+    return m.status()
 
 
-@app.get("/joint-positions")
-def get_joint_positions():
-    """Get current robot joint positions"""
-    return handle_get_joint_positions()
+# @app.get("/joint-positions")
+# def get_joint_positions():
+#     """Get current robot joint positions"""
+#     return handle_get_joint_positions()
 
 
 @app.get("/health")
@@ -130,106 +149,6 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         manager.disconnect(websocket)
         logger.info("🧹 WebSocket connection cleaned up")
-
-
-# @app.post("/start-recording")
-# def start_recording(request: RecordingRequest):
-#     """Start a dataset recording session"""
-#     return handle_start_recording(request, manager)
-
-
-# @app.post("/stop-recording")
-# def stop_recording():
-#     """Stop the current recording session"""
-#     return handle_stop_recording()
-
-
-# @app.get("/recording-status")
-# def recording_status():
-#     """Get the current recording status"""
-#     return handle_recording_status()
-
-
-# @app.post("/recording-exit-early")
-# def recording_exit_early():
-#     """Skip to next episode (replaces right arrow key)"""
-#     return handle_exit_early()
-
-
-# @app.post("/recording-rerecord-episode")
-# def recording_rerecord_episode():
-#     """Re-record current episode (replaces left arrow key)"""
-#     return handle_rerecord_episode()
-
-
-# @app.post("/upload-dataset")
-# def upload_dataset(request: UploadRequest):
-#     """Upload dataset to HuggingFace Hub"""
-#     return handle_upload_dataset(request)
-
-
-# @app.post("/dataset-info")
-# def get_dataset_info(request: DatasetInfoRequest):
-#     """Get information about a saved dataset"""
-#     return handle_get_dataset_info(request)
-
-
-# ============================================================================
-# TRAINING ENDPOINTS
-# ============================================================================
-
-
-# @app.post("/start-training")
-# def start_training(request: TrainingRequest):
-#     """Start a training session"""
-#     return handle_start_training(request)
-
-
-# @app.post("/stop-training")
-# def stop_training():
-#     """Stop the current training session"""
-#     return handle_stop_training()
-
-
-# @app.get("/training-status")
-# def training_status():
-#     """Get the current training status"""
-#     return handle_training_status()
-
-
-# @app.get("/training-logs")
-# def training_logs():
-#     """Get recent training logs"""
-#     return handle_training_logs()
-
-
-# ============================================================================
-# REPLAY ENDPOINTS
-# ============================================================================
-
-
-# @app.post("/start-replay")
-# def start_replay(request: ReplayRequest):
-#     """Start a replay session"""
-#     return handle_start_replay(request)
-
-
-# @app.post("/stop-replay")
-# def stop_replay():
-#     """Stop the current replay session"""
-#     return handle_stop_replay()
-
-
-# @app.get("/replay-status")
-# def replay_status():
-#     """Get the current replay status"""
-#     return handle_replay_status()
-
-
-# @app.get("/replay-logs")
-# def replay_logs():
-#     """Get recent replay logs"""
-#     return handle_replay_logs()
 
 
 # ============================================================================
@@ -490,20 +409,3 @@ def get_robot_config(robot_type: str, available_configs: str = ""):
     except Exception as e:
         logger.error(f"Error getting robot configuration: {e}")
         return {"status": "error", "message": str(e)}
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up resources when FastAPI shuts down"""
-    logger.info("🔄 FastAPI shutting down, cleaning up...")
-
-    # Stop any active recording - handled by recording module cleanup
-
-    # Clean up replay resources
-    from .replaying import cleanup as replay_cleanup
-
-    replay_cleanup()
-
-    if manager:
-        manager.stop_broadcast_thread()
-    logger.info("✅ Cleanup completed")

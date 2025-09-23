@@ -38,11 +38,8 @@ def setup_calibration_files(leader_config: str, follower_config: str):
     leader_config_full_path = os.path.join(LEADER_CONFIG_PATH, leader_config)
     follower_config_full_path = os.path.join(FOLLOWER_CONFIG_PATH, follower_config)
 
-    logger.info(f"Checking calibration files:")
     logger.info(f"Leader config path: {leader_config_full_path}")
     logger.info(f"Follower config path: {follower_config_full_path}")
-    logger.info(f"Leader config exists: {os.path.exists(leader_config_full_path)}")
-    logger.info(f"Follower config exists: {os.path.exists(follower_config_full_path)}")
 
     # Create calibration directories if they don't exist
     leader_calibration_dir = os.path.join(CALIBRATION_BASE_PATH_TELEOP, "so101_leader")
