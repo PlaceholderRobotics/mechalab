@@ -12,7 +12,7 @@ from lerobot.robots.so101_follower import SO101FollowerConfig
 from lerobot.robots.so100_follower import SO100FollowerConfig
 
 # Import calibration setup from config
-from .config import setup_follower_calibration_file
+from app.config import setup_follower_calibration_file
 
 # Simple global state
 replay_active = False

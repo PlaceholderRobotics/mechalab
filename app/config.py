@@ -38,8 +38,8 @@ def setup_calibration_files(leader_config: str, follower_config: str):
     leader_config_full_path = os.path.join(LEADER_CONFIG_PATH, leader_config)
     follower_config_full_path = os.path.join(FOLLOWER_CONFIG_PATH, follower_config)
 
-    logger.info(f"Leader config path: {leader_config_full_path}")
-    logger.info(f"Follower config path: {follower_config_full_path}")
+    logger.debug(f"Leader config path: {leader_config_full_path}")
+    logger.debug(f"Follower config path: {follower_config_full_path}")
 
     # Create calibration directories if they don't exist
     leader_calibration_dir = os.path.join(CALIBRATION_BASE_PATH_TELEOP, "so101_leader")
@@ -60,24 +60,22 @@ def setup_calibration_files(leader_config: str, follower_config: str):
     if not os.path.exists(leader_target_path):
         if os.path.exists(leader_config_full_path):
             shutil.copy2(leader_config_full_path, leader_target_path)
-            logger.info(f"Copied leader calibration to {leader_target_path}")
         else:
             raise FileNotFoundError(
                 f"Leader calibration file not found: {leader_config_full_path}"
             )
     else:
-        logger.info(f"Leader calibration already exists at {leader_target_path}")
+        logger.warning(f"Leader calibration already exists at {leader_target_path}")
 
     if not os.path.exists(follower_target_path):
         if os.path.exists(follower_config_full_path):
             shutil.copy2(follower_config_full_path, follower_target_path)
-            logger.info(f"Copied follower calibration to {follower_target_path}")
         else:
             raise FileNotFoundError(
                 f"Follower calibration file not found: {follower_config_full_path}"
             )
     else:
-        logger.info(f"Follower calibration already exists at {follower_target_path}")
+        logger.debug(f"Follower calibration already exists at {follower_target_path}")
 
     return leader_config_name, follower_config_name
 
@@ -89,10 +87,6 @@ def setup_follower_calibration_file(follower_config: str):
 
     # Log the full path to check if file exists
     follower_config_full_path = os.path.join(FOLLOWER_CONFIG_PATH, follower_config)
-
-    logger.info(f"Checking follower calibration file:")
-    logger.info(f"Follower config path: {follower_config_full_path}")
-    logger.info(f"Follower config exists: {os.path.exists(follower_config_full_path)}")
 
     # Create calibration directory if it doesn't exist
     follower_calibration_dir = os.path.join(
@@ -108,13 +102,12 @@ def setup_follower_calibration_file(follower_config: str):
     if not os.path.exists(follower_target_path):
         if os.path.exists(follower_config_full_path):
             shutil.copy2(follower_config_full_path, follower_target_path)
-            logger.info(f"Copied follower calibration to {follower_target_path}")
         else:
             raise FileNotFoundError(
                 f"Follower calibration file not found: {follower_config_full_path}"
             )
     else:
-        logger.info(f"Follower calibration already exists at {follower_target_path}")
+        logger.warning(f"Follower calibration already exists at {follower_target_path}")
 
     return follower_config_name
 
@@ -127,7 +120,6 @@ def find_available_ports():
         raise ImportError(
             "pyserial library is required. Install it with: pip install pyserial"
         )
-
     if platform.system() == "Windows":
         # List COM ports using pyserial
         ports = [port.device for port in list_ports.comports()]
@@ -147,12 +139,8 @@ def find_robot_port(robot_type="robot"):
     Returns:
         str: The detected port
     """
-    logger.info(f"Finding port for {robot_type}")
-
     # Get initial ports
     ports_before = find_available_ports()
-    logger.info(f"Ports before disconnecting: {ports_before}")
-
     # This function returns the port detection logic, but the actual user interaction
     # should be handled by the frontend
     return {"ports_before": ports_before, "robot_type": robot_type}
@@ -172,9 +160,6 @@ def detect_port_after_disconnect(ports_before):
     ports_after = find_available_ports()
     ports_diff = list(set(ports_before) - set(ports_after))
 
-    logger.info(f"Ports after disconnecting: {ports_after}")
-    logger.info(f"Port difference: {ports_diff}")
-
     if len(ports_diff) == 1:
         port = ports_diff[0]
         logger.info(f"Detected port: {port}")
@@ -185,25 +170,6 @@ def detect_port_after_disconnect(ports_before):
         raise OSError(
             f"Could not detect the port. More than one port was found ({ports_diff})."
         )
-
-
-def save_robot_port(robot_type, port):
-    """
-    Save the robot port to a file for future use
-
-    Args:
-        robot_type (str): "leader" or "follower"
-        port (str): The port to save
-    """
-    # Create port config directory if it doesn't exist
-    os.makedirs(PORT_CONFIG_PATH, exist_ok=True)
-
-    port_file = LEADER_PORT_FILE if robot_type == "leader" else FOLLOWER_PORT_FILE
-
-    with open(port_file, "w") as f:
-        f.write(port)
-
-    logger.info(f"Saved {robot_type} port: {port}")
 
 
 def get_saved_robot_port(robot_type):

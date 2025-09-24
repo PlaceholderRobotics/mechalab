@@ -11,7 +11,6 @@ from .services.websocket_manager import manager
 from .features.teleoperate import (
     TeleoperateRequest,
     TeleoperationManager,
-    # handle_get_joint_positions,
 )
 from .features.calibrate import CalibrationRequest, calibration_manager
 from app.config import (
@@ -20,7 +19,6 @@ from app.config import (
     find_available_ports,
     find_robot_port,
     detect_port_after_disconnect,
-    save_robot_port,
     get_saved_robot_port,
     get_default_robot_port,
 )
@@ -37,9 +35,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("🔄 FastAPI shutting down, cleaning up...")
-    # from .replaying import cleanup as replay_cleanup
-
-    # replay_cleanup()
     if manager:
         manager.stop_broadcast_thread()
     logger.info("✅ Cleanup completed")
@@ -66,21 +61,13 @@ def root_redirect():
     return RedirectResponse(url="/docs")
 
 
-@app.get("/get-configs")
-def get_configs():
-    # Get all available calibration configs
-    leader_configs = [
-        os.path.basename(f)
-        for f in glob.glob(os.path.join(LEADER_CONFIG_PATH, "*.json"))
-    ]
-    follower_configs = [
-        os.path.basename(f)
-        for f in glob.glob(os.path.join(FOLLOWER_CONFIG_PATH, "*.json"))
-    ]
-
-    return {"leader_configs": leader_configs, "follower_configs": follower_configs}
+@app.get("/health")
+def health_check():
+    """Simple health check endpoint to verify server is running"""
+    return {"status": "ok", "message": "FastAPI server is running"}
 
 
+# TELEOPERATION ENDPOINTS
 @app.post("/teleop/start")
 def teleoperate_arm(
     req: TeleoperateRequest, m: TeleoperationManager = Depends(get_teleop_manager)
@@ -101,27 +88,9 @@ def teleoperation_status(m: TeleoperationManager = Depends(get_teleop_manager)):
     return m.status()
 
 
-# @app.get("/joint-positions")
-# def get_joint_positions():
-#     """Get current robot joint positions"""
-#     return handle_get_joint_positions()
-
-
-@app.get("/health")
-def health_check():
-    """Simple health check endpoint to verify server is running"""
-    return {"status": "ok", "message": "FastAPI server is running"}
-
-
-@app.get("/ws-test")
-def websocket_test():
-    """Test endpoint to verify WebSocket support"""
-    return {"websocket_endpoint": "/ws/joint-data", "status": "available"}
-
-
+# WEBSOCKET ENDPOINTS
 @app.websocket("/ws/joint-data")
 async def websocket_endpoint(websocket: WebSocket):
-    logger.info("🔗 New WebSocket connection attempt")
     try:
         await manager.connect(websocket)
         logger.info("✅ WebSocket connection established")
@@ -151,8 +120,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("🧹 WebSocket connection cleaned up")
 
 
-# ============================================================================
-# Calibration endpoints
+# CALIBRATION ENDPOINTS
 @app.post("/start-calibration")
 def start_calibration(request: CalibrationRequest):
     """Start calibration process"""
@@ -250,114 +218,19 @@ def delete_calibration_config(device_type: str, config_name: str):
         return {"success": False, "message": str(e)}
 
 
-# ============================================================================
-# PORT DETECTION ENDPOINTS
-# ============================================================================
+@app.get("/get-configs")
+def get_configs():
+    # Get all available calibration configs
+    leader_configs = [
+        os.path.basename(f)
+        for f in glob.glob(os.path.join(LEADER_CONFIG_PATH, "*.json"))
+    ]
+    follower_configs = [
+        os.path.basename(f)
+        for f in glob.glob(os.path.join(FOLLOWER_CONFIG_PATH, "*.json"))
+    ]
 
-
-@app.get("/available-ports")
-def get_available_ports():
-    """Get all available serial ports"""
-    try:
-        ports = find_available_ports()
-        return {"status": "success", "ports": ports}
-    except Exception as e:
-        logger.error(f"Error getting available ports: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/available-cameras")
-def get_available_cameras():
-    """Get all available cameras"""
-    try:
-        # Try to detect cameras using OpenCV
-        import cv2
-
-        cameras = []
-
-        # Test up to 10 camera indices
-        for i in range(10):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret:
-                    cameras.append(
-                        {
-                            "index": i,
-                            "name": f"Camera {i}",
-                            "available": True,
-                            "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                            "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-                            "fps": int(cap.get(cv2.CAP_PROP_FPS)),
-                        }
-                    )
-                cap.release()
-
-        return {"status": "success", "cameras": cameras}
-    except ImportError:
-        # OpenCV not available, return empty list
-        logger.warning("OpenCV not available for camera detection")
-        return {"status": "success", "cameras": []}
-    except Exception as e:
-        logger.error(f"Error detecting cameras: {e}")
-        return {"status": "error", "message": str(e), "cameras": []}
-
-
-@app.post("/start-port-detection")
-def start_port_detection(data: dict):
-    """Start port detection process for a robot"""
-    try:
-        robot_type = data.get("robot_type", "robot")
-        result = find_robot_port(robot_type)
-        return {"status": "success", "data": result}
-    except Exception as e:
-        logger.error(f"Error starting port detection: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@app.post("/detect-port-after-disconnect")
-def detect_port_after_disconnect_endpoint(data: dict):
-    """Detect port after disconnection"""
-    try:
-        ports_before = data.get("ports_before", [])
-        detected_port = detect_port_after_disconnect(ports_before)
-        return {"status": "success", "port": detected_port}
-    except Exception as e:
-        logger.error(f"Error detecting port: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@app.post("/save-robot-port")
-def save_robot_port_endpoint(data: dict):
-    """Save a robot port for future use"""
-    try:
-        robot_type = data.get("robot_type")
-        port = data.get("port")
-
-        if not robot_type or not port:
-            return {"status": "error", "message": "robot_type and port are required"}
-
-        save_robot_port(robot_type, port)
-        return {"status": "success", "message": f"Port {port} saved for {robot_type}"}
-    except Exception as e:
-        logger.error(f"Error saving robot port: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/robot-port/{robot_type}")
-def get_robot_port(robot_type: str):
-    """Get the saved port for a robot type"""
-    try:
-        saved_port = get_saved_robot_port(robot_type)
-        default_port = get_default_robot_port(robot_type)
-        return {
-            "status": "success",
-            "saved_port": saved_port,
-            "default_port": default_port,
-        }
-    except Exception as e:
-        logger.error(f"Error getting robot port: {e}")
-        return {"status": "error", "message": str(e)}
+    return {"leader_configs": leader_configs, "follower_configs": follower_configs}
 
 
 @app.post("/save-robot-config")
@@ -408,4 +281,56 @@ def get_robot_config(robot_type: str, available_configs: str = ""):
         }
     except Exception as e:
         logger.error(f"Error getting robot configuration: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# PORT DETECTION ENDPOINTS
+@app.get("/setup/ports")
+def get_available_ports():
+    """Get all available serial ports"""
+    try:
+        ports = find_available_ports()
+        return {"status": "success", "ports": ports}
+    except Exception as e:
+        logger.error(f"Error getting available ports: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/start-port-detection")
+def start_port_detection(data: dict):
+    """Start port detection process for a robot"""
+    try:
+        robot_type = data.get("robot_type", "robot")
+        result = find_robot_port(robot_type)
+        return {"status": "success", "data": result}
+    except Exception as e:
+        logger.error(f"Error starting port detection: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/detect-port-after-disconnect")
+def detect_port_after_disconnect_endpoint(data: dict):
+    """Detect port after disconnection"""
+    try:
+        ports_before = data.get("ports_before", [])
+        detected_port = detect_port_after_disconnect(ports_before)
+        return {"status": "success", "port": detected_port}
+    except Exception as e:
+        logger.error(f"Error detecting port: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/robot-port/{robot_type}")
+def get_robot_port(robot_type: str):
+    """Get the saved port for a robot type"""
+    try:
+        saved_port = get_saved_robot_port(robot_type)
+        default_port = get_default_robot_port(robot_type)
+        return {
+            "status": "success",
+            "saved_port": saved_port,
+            "default_port": default_port,
+        }
+    except Exception as e:
+        logger.error(f"Error getting robot port: {e}")
         return {"status": "error", "message": str(e)}
